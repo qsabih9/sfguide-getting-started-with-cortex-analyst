@@ -8,18 +8,6 @@ tables:
       schema: sabih
       table: daily_revenue
     dimensions:
-      - name: MONTHa
-        synonyms:
-          - revenue_month
-          - sales_month
-        description: Month extracted from the date in 'YYYY-MM' format. Use this to group data by month.
-        expr: DATE_TRUNC('MONTH', date)
-        data_type: ''
-        unique: false
-        sample_values: []
-        cortex_search_service_name: ''
-        is_enum: false
-        tags: []
       - name: product_id
         expr: product_id
         data_type: number
@@ -70,31 +58,7 @@ tables:
         expr: revenue
         default_aggregation: sum
         data_type: number
-    metrics:
-      - name: MIN_DAILY_REVENUE
-        synonyms:
-          - lowest_daily_sales
-          - min_sales_day
-          - minimum_income
-        description: Calculates the minimum daily revenue within a given period. Use this metric to identify the lowest sales day in a month or other time window, which is critical for understanding sales volatility, risk, and operational bottlenecks.
-        expr: MIN(daily_revenue.revenue)
-        access_modifier: public_access
-        tags: []
-        non_additive_dimensions: []
-        additive_dimensions: []
-        using_relationships: []
-      - name: MIN_DAILY_REVENUE_PER_MONTH
-        synonyms:
-          - lowest_monthly_daily_revenue
-          - min_sales_day_per_month
-          - minimum_monthly_income
-        description: Minimum daily revenue for each month. Use this metric to identify the lowest sales day in a month.
-        expr: MIN(daily_revenue) GROUP BY DATE_TRUNC('MONTH', date)
-        access_modifier: public_access
-        tags: []
-        non_additive_dimensions: []
-        additive_dimensions: []
-        using_relationships: []
+    metrics: []
     primary_key:
       columns:
         - DATE
