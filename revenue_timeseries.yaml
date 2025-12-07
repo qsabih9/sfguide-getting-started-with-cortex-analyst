@@ -1,77 +1,118 @@
 name: Revenue
+description: Revenue analytics semantic model grounded on daily revenue, COGS, forecasts, with product and region dimensions.
 tables:
   - name: daily_revenue
-    description: Daily total revenue, aligned with daily "Cost of Goods Sold" (COGS), and forecasted revenue.
+    description: Daily total revenue, aligned with daily COGS and forecasted revenue.
     base_table:
       database: cortex_db
       schema: sabih
       table: daily_revenue
-    primary_key:
-      columns:
-        - date
-        - product_id
-        - region_id
-    time_dimensions:
-      - name: date
-        expr: date
-        description: date with measures of revenue, COGS, and forecasted revenue.
-        unique: true
-        data_type: date
-    measures:
-      - name: daily_revenue
-        expr: revenue
-        description: total revenue for the given day
-        synonyms: ["sales", "income"]
-        default_aggregation: sum
-        data_type: number
-      - name: daily_cogs
-        expr: cogs
-        description: total cost of goods sold for the given day
-        synonyms: ["cost", "expenditures"]
-        default_aggregation: sum
-        data_type: number
-      - name: daily_forecasted_revenue
-        expr: forecasted_revenue
-        description: total forecasted revenue for a given day
-        synonyms: ["forecasted sales", "forecasted income"]
-        default_aggregation: sum
-        data_type: number
-      - name: daily_profit
-        description: profit is the difference between revenue and expenses.
-        expr: revenue - cogs
-        data_type: number
-      - name: daily_forecast_abs_error
-        synonyms:
-          - absolute error
-          - L1
-        description: absolute error between forecasted and actual revenue
-        expr: abs(forecasted_revenue - revenue)
-        data_type: number
-        default_aggregation: avg
     dimensions:
+      - name: MONTHa
+        synonyms:
+          - revenue_month
+          - sales_month
+        description: Month extracted from the date in 'YYYY-MM' format. Use this to group data by month.
+        expr: DATE_TRUNC('MONTH', date)
+        data_type: ''
+        unique: false
+        sample_values: []
+        cortex_search_service_name: ''
+        is_enum: false
+        tags: []
       - name: product_id
         expr: product_id
         data_type: number
       - name: region_id
         expr: region_id
         data_type: number
-
+    time_dimensions:
+      - name: date
+        description: Date of observation with measures of revenue, COGS, and forecasted revenue.
+        expr: date
+        unique: false
+        data_type: date
+    facts:
+      - name: daily_cogs
+        synonyms:
+          - cost
+          - expenditures
+        description: Total cost of goods sold for the given day
+        expr: cogs
+        default_aggregation: sum
+        data_type: number
+      - name: daily_forecast_abs_error
+        synonyms:
+          - absolute error
+          - L1
+        description: Absolute error between forecasted and actual revenue (MAE when averaged).
+        expr: abs(forecasted_revenue - revenue)
+        data_type: number
+        default_aggregation: avg
+      - name: daily_forecasted_revenue
+        synonyms:
+          - forecasted income
+          - forecasted sales
+        description: Total forecasted revenue for a given day
+        expr: forecasted_revenue
+        default_aggregation: sum
+        data_type: number
+      - name: daily_profit
+        description: Profit is revenue minus COGS.
+        expr: revenue - cogs
+        data_type: number
+        default_aggregation: sum
+      - name: daily_revenue
+        synonyms:
+          - income
+          - sales
+        description: Total revenue for the given day
+        expr: revenue
+        default_aggregation: sum
+        data_type: number
+    metrics:
+      - name: MIN_DAILY_REVENUE
+        synonyms:
+          - lowest_daily_sales
+          - min_sales_day
+          - minimum_income
+        description: Calculates the minimum daily revenue within a given period. Use this metric to identify the lowest sales day in a month or other time window, which is critical for understanding sales volatility, risk, and operational bottlenecks.
+        expr: MIN(daily_revenue.revenue)
+        access_modifier: public_access
+        tags: []
+        non_additive_dimensions: []
+        additive_dimensions: []
+        using_relationships: []
+      - name: MIN_DAILY_REVENUE_PER_MONTH
+        synonyms:
+          - lowest_monthly_daily_revenue
+          - min_sales_day_per_month
+          - minimum_monthly_income
+        description: Minimum daily revenue for each month. Use this metric to identify the lowest sales day in a month.
+        expr: MIN(daily_revenue) GROUP BY DATE_TRUNC('MONTH', date)
+        access_modifier: public_access
+        tags: []
+        non_additive_dimensions: []
+        additive_dimensions: []
+        using_relationships: []
+    primary_key:
+      columns:
+        - DATE
+        - PRODUCT_ID
+        - REGION_ID
   - name: product
     description: Product dimension table with unique product identifiers and attributes.
     base_table:
       database: cortex_db
       schema: sabih
       table: product_dim
-    primary_key:
-      columns:
-        - product_id
     dimensions:
       - name: product_id
         expr: product_id
         data_type: number
       - name: product_line
-        expr: product_line
         description: Product line associated with revenue
+        expr: product_line
         data_type: varchar
         sample_values:
           - Electronics
@@ -79,23 +120,22 @@ tables:
           - Home Appliances
           - Toys
           - Books
-
+    primary_key:
+      columns:
+        - PRODUCT_ID
   - name: region
     description: Region dimension table with unique region identifiers and geographic attributes.
     base_table:
       database: cortex_db
       schema: sabih
       table: region_dim
-    primary_key:
-      columns:
-        - region_id
     dimensions:
       - name: region_id
         expr: region_id
         data_type: number
       - name: sales_region
-        expr: sales_region
         description: Region associated with revenue
+        expr: sales_region
         data_type: varchar
         sample_values:
           - North America
@@ -103,80 +143,123 @@ tables:
           - Asia
           - South America
           - Africa
-
-  - name: product_dimension
-    base_table:
-      database: cortex_db
-      schema: sabih
-      table: product_dim
-
-    dimensions:
-      - name: product_line
-        expr: product_line
-        cortex_search_service_name: product_line_search_service
-        data_type: varchar
-
-
+    primary_key:
+      columns:
+        - REGION_ID
 relationships:
   - name: revenue_to_product
     left_table: daily_revenue
     right_table: product
     relationship_columns:
       - left_column: product_id
-        right_column: product_id
+        right_column: PRODUCT_ID
     join_type: left_outer
     relationship_type: many_to_one
-
   - name: revenue_to_region
     left_table: daily_revenue
     right_table: region
     relationship_columns:
       - left_column: region_id
-        right_column: region_id
+        right_column: REGION_ID
     join_type: left_outer
     relationship_type: many_to_one
-
-  
-
 verified_queries:
- # For eval sample nlimtiaco_sc_3__0
-  - name: "daily cumulative expenses in 2023 dec"
-    question: "daily cumulative expenses in 2023 dec"
+  - name: daily cumulative expenses in 2023 dec
+    question: daily cumulative expenses in 2023 dec
     verified_at: 1714752498
     verified_by: renee
-    sql: "
-SELECT
-  date,
-  SUM(daily_cogs) OVER (
-    ORDER BY
-      date ROWS BETWEEN UNBOUNDED PRECEDING
-      AND CURRENT ROW
-  ) AS cumulative_cogs
-FROM
-  daily_revenue
-WHERE
-  date BETWEEN '2023-12-01'
-  AND '2023-12-31'
-ORDER BY
-  date DESC;
-"
- # For eval sample nlimtiaco_sc_6__0
-  - name: "lowest revenue each month"
-    question: "For each month, what was the lowest daily revenue and on what date did that lowest revenue occur?"
-    sql: "WITH monthly_min_revenue AS (
-        SELECT
-          DATE_TRUNC('MONTH', date) AS month,
-          MIN(daily_revenue) AS min_revenue
-        FROM daily_revenue
-          GROUP BY
-            DATE_TRUNC('MONTH', date)
-        )
-        SELECT
-          mmr.month,
-          mmr.min_revenue,
-          dr.date AS min_revenue_date
-        FROM monthly_min_revenue AS mmr JOIN daily_revenue AS dr
-          ON mmr.month = DATE_TRUNC('MONTH', dr.date) AND mmr.min_revenue = dr.daily_revenue
-        ORDER BY mmr.month DESC NULLS LAST"
+    sql: |
+      SELECT
+        date,
+        SUM(cogs) OVER (
+          ORDER BY date
+          ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+        ) AS cumulative_cogs
+      FROM cortex_db.sabih.daily_revenue
+      WHERE date BETWEEN '2023-12-01' AND '2023-12-31'
+      ORDER BY date DESC;
+  - name: lowest revenue each month
+    question: For each month, what was the lowest daily revenue and on what date did that lowest revenue occur?
     verified_at: 1715187400
     verified_by: renee
+    sql: |
+      WITH monthly_min_revenue AS (
+        SELECT
+          DATE_TRUNC('MONTH', date) AS month,
+          MIN(revenue) AS min_revenue
+        FROM cortex_db.sabih.daily_revenue
+        GROUP BY DATE_TRUNC('MONTH', date)
+      )
+      SELECT
+        mmr.month,
+        mmr.min_revenue,
+        dr.date AS min_revenue_date
+      FROM monthly_min_revenue AS mmr
+      JOIN cortex_db.sabih.daily_revenue AS dr
+        ON mmr.month = DATE_TRUNC('MONTH', dr.date)
+       AND mmr.min_revenue = dr.revenue
+      ORDER BY mmr.month DESC NULLS LAST;
+custom_instructions: |
+  ## Analyst Instructions
+  You are a revenue analytics expert. Use the defined measures and dimensions,
+  provide month/quarter/YTD views, compare YoY where relevant, and include SQL and table citations.
+  Ask clarifying questions when intent or grain is ambiguous.
+  Always ground answers on the semantic layer measures and dimensions and cite the underlying tables.
+  Prefer grouping by product_line and sales_region when a segmentation is requested.
+  Summarize insights and potential drivers in a concise narrative.
+
+  ## Standard NLQ Prompt Templates
+  Use the following prompt templates to structure queries. Variables in braces {…} are placeholders to be filled.
+
+  ### kpi_summary
+  - Description: High-level KPIs over a specified period and grain.
+  - Template:
+    Provide {time_grain} KPIs for {date_range}. Include:
+    - Total revenue (daily_revenue) and COGS (daily_cogs)
+    - Profit (daily_profit) = revenue - cogs
+    - YoY % change if the comparison period exists
+    Group by: {group_by}
+    Filters: {filters}
+    Return: table + concise narrative with drivers and SQL (with citations).
+  - Variables:
+    - time_grain:
+      - day
+      - week
+      - month
+      - quarter
+    - date_range:
+      - last 3 months
+      - Q3 2024
+      - 2023-12-01 to 2023-12-31
+      - YTD
+    - group_by:
+      - product_line
+      - sales_region
+      - product_id
+      - region_id
+    - filters:
+      - product_line = 'Electronics'
+      - sales_region IN ('Europe','Asia')
+  - Examples:
+    - Show monthly revenue, COGS, and profit by product_line for Q3 2024.
+    - Daily KPIs last 30 days filtered to Europe.
+
+  ### trend_analysis
+  - Description: Time-series trend analysis with optional YoY and MoM deltas.
+  - Template:
+    Plot and summarize {measure} over {date_range} by {time_grain}.
+    Show YoY and MoM deltas when applicable. Group by: {group_by}. Filters: {filters}.
+    Include SQL and citations. Explain seasonality or anomalies if detected.
+  - Variables:
+    - measure:
+      - daily_revenue
+      - daily_cogs
+      - daily_profit
+      - daily_forecasted_revenue
+    - time_grain:
+      - day
+      - week
+      - month
+    - date_range:
+      - last 12 months
+      - 2024
