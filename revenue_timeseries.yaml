@@ -1,83 +1,87 @@
-name: Revenue
+name: REVENUE
 description: Revenue analytics semantic model grounded on daily revenue, COGS, forecasts, with product and region dimensions.
 tables:
-  - name: daily_revenue
+  - name: DAILY_REVENUE
     description: Daily total revenue, aligned with daily COGS and forecasted revenue.
     base_table:
-      database: cortex_db
-      schema: sabih
-      table: daily_revenue
+      database: CORTEX_DB
+      schema: SABIH
+      table: DAILY_REVENUE
     dimensions:
-      - name: product_id
+      - name: PRODUCT_ID
         expr: product_id
-        data_type: number
-      - name: region_id
+        data_type: NUMBER(38,0)
+      - name: REGION_ID
         expr: region_id
-        data_type: number
+        data_type: NUMBER(38,0)
     time_dimensions:
-      - name: date
+      - name: DATE
         description: Date of observation with measures of revenue, COGS, and forecasted revenue.
         expr: date
+        data_type: DATE
         unique: false
-        data_type: date
     facts:
-      - name: daily_cogs
+      - name: DAILY_COGS
         synonyms:
           - cost
           - expenditures
         description: Total cost of goods sold for the given day
         expr: cogs
+        data_type: FLOAT
+        access_modifier: public_access
         default_aggregation: sum
-        data_type: number
-      - name: daily_forecast_abs_error
+      - name: DAILY_FORECAST_ABS_ERROR
         synonyms:
           - absolute error
           - L1
         description: Absolute error between forecasted and actual revenue (MAE when averaged).
         expr: abs(forecasted_revenue - revenue)
-        data_type: number
+        data_type: FLOAT
+        access_modifier: public_access
         default_aggregation: avg
-      - name: daily_forecasted_revenue
+      - name: DAILY_FORECASTED_REVENUE
         synonyms:
           - forecasted income
           - forecasted sales
         description: Total forecasted revenue for a given day
         expr: forecasted_revenue
+        data_type: FLOAT
+        access_modifier: public_access
         default_aggregation: sum
-        data_type: number
-      - name: daily_profit
+      - name: DAILY_PROFIT
         description: Profit is revenue minus COGS.
         expr: revenue - cogs
-        data_type: number
+        data_type: FLOAT
+        access_modifier: public_access
         default_aggregation: sum
-      - name: daily_revenue
+      - name: DAILY_REVENUE
         synonyms:
           - income
           - sales
         description: Total revenue for the given day
         expr: revenue
+        data_type: FLOAT
+        access_modifier: public_access
         default_aggregation: sum
-        data_type: number
-    metrics: []
     primary_key:
       columns:
         - DATE
         - PRODUCT_ID
         - REGION_ID
-  - name: product
+  - name: PRODUCT
     description: Product dimension table with unique product identifiers and attributes.
     base_table:
-      database: cortex_db
-      schema: sabih
-      table: product_dim
+      database: CORTEX_DB
+      schema: SABIH
+      table: PRODUCT_DIM
     dimensions:
-      - name: product_id
+      - name: PRODUCT_ID
         expr: product_id
-        data_type: number
-      - name: product_line
+        data_type: NUMBER(38,0)
+      - name: PRODUCT_LINE
         description: Product line associated with revenue
         expr: product_line
-        data_type: varchar
+        data_type: VARCHAR(16777216)
         sample_values:
           - Electronics
           - Clothing
@@ -87,20 +91,20 @@ tables:
     primary_key:
       columns:
         - PRODUCT_ID
-  - name: region
+  - name: REGION
     description: Region dimension table with unique region identifiers and geographic attributes.
     base_table:
-      database: cortex_db
-      schema: sabih
-      table: region_dim
+      database: CORTEX_DB
+      schema: SABIH
+      table: REGION_DIM
     dimensions:
-      - name: region_id
+      - name: REGION_ID
         expr: region_id
-        data_type: number
-      - name: sales_region
+        data_type: NUMBER(38,0)
+      - name: SALES_REGION
         description: Region associated with revenue
         expr: sales_region
-        data_type: varchar
+        data_type: VARCHAR(16777216)
         sample_values:
           - North America
           - Europe
@@ -111,59 +115,86 @@ tables:
       columns:
         - REGION_ID
 relationships:
-  - name: revenue_to_product
-    left_table: daily_revenue
-    right_table: product
+  - name: REVENUE_TO_PRODUCT
+    left_table: DAILY_REVENUE
+    right_table: PRODUCT
     relationship_columns:
-      - left_column: product_id
+      - left_column: PRODUCT_ID
         right_column: PRODUCT_ID
-    join_type: left_outer
     relationship_type: many_to_one
-  - name: revenue_to_region
-    left_table: daily_revenue
-    right_table: region
+    join_type: left_outer
+  - name: REVENUE_TO_REGION
+    left_table: DAILY_REVENUE
+    right_table: REGION
     relationship_columns:
-      - left_column: region_id
+      - left_column: REGION_ID
         right_column: REGION_ID
-    join_type: left_outer
     relationship_type: many_to_one
+    join_type: left_outer
 verified_queries:
   - name: daily cumulative expenses in 2023 dec
     question: daily cumulative expenses in 2023 dec
-    verified_at: 1714752498
-    verified_by: renee
-    sql: |
+    sql: |-
       SELECT
         date,
         SUM(cogs) OVER (
-          ORDER BY date
-          ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+          ORDER BY
+            date ROWS BETWEEN UNBOUNDED PRECEDING
+            AND CURRENT ROW
         ) AS cumulative_cogs
-      FROM cortex_db.sabih.daily_revenue
-      WHERE date BETWEEN '2023-12-01' AND '2023-12-31'
-      ORDER BY date DESC;
-  - name: lowest revenue each month
-    question: For each month, what was the lowest daily revenue and on what date did that lowest revenue occur?
-    verified_at: 1715187400
-    verified_by: renee
-    sql: |
-      WITH monthly_min_revenue AS (
-        SELECT
-          DATE_TRUNC('MONTH', date) AS month,
-          MIN(revenue) AS min_revenue
-        FROM cortex_db.sabih.daily_revenue
-        GROUP BY DATE_TRUNC('MONTH', date)
-      )
+      FROM
+        cortex_db.sabih.daily_revenue
+      WHERE
+        date BETWEEN '2023-12-01'
+        AND '2023-12-31'
+      ORDER BY
+        date DESC;
+    use_as_onboarding_question: false
+    verified_by: Qazi Sabih
+    verified_at: 1765111219
+  - name: What is the total profit generated from electronics products over the entire period available in the data?
+    question: What is the total profit generated from electronics products over the entire period available in the data?
+    sql: |-
       SELECT
-        mmr.month,
-        mmr.min_revenue,
-        dr.date AS min_revenue_date
-      FROM monthly_min_revenue AS mmr
-      JOIN cortex_db.sabih.daily_revenue AS dr
-        ON mmr.month = DATE_TRUNC('MONTH', dr.date)
-       AND mmr.min_revenue = dr.revenue
-      ORDER BY mmr.month DESC NULLS LAST;
-custom_instructions: |
+        p.product_line,
+        MIN(dr.date) AS start_date,
+        MAX(dr.date) AS end_date,
+        SUM(dr.daily_profit) AS total_daily_profit
+      FROM
+        daily_revenue AS dr
+        LEFT JOIN product AS p ON dr.product_id = p.product_id
+      WHERE
+        p.product_line = 'Electronics'
+      GROUP BY
+        p.product_line
+    use_as_onboarding_question: false
+    verified_by: Qazi Sabih
+    verified_at: 1765111160
+  - name: How did revenue, cost of goods sold, and profit by product line trend each month from July to September 2024?
+    question: How did revenue, cost of goods sold, and profit by product line trend each month from July to September 2024?
+    sql: |-
+      SELECT
+        DATE_TRUNC('MONTH', dr.date) AS month,
+        p.product_line,
+        SUM(dr.daily_revenue) AS monthly_revenue,
+        SUM(dr.daily_cogs) AS monthly_cogs,
+        SUM(dr.daily_profit) AS monthly_profit
+      FROM
+        daily_revenue AS dr
+        LEFT OUTER JOIN product AS p ON dr.product_id = p.product_id
+      WHERE
+        dr.date <= '2024-09-30'
+        AND dr.date >= '2024-07-01'
+      GROUP BY
+        month,
+        p.product_line
+      ORDER BY
+        month DESC NULLS LAST,
+        p.product_line
+    use_as_onboarding_question: false
+    verified_by: Qazi Sabih
+    verified_at: 1765111174
+custom_instructions: |-
   ## Analyst Instructions
   You are a revenue analytics expert. Use the defined measures and dimensions,
   provide month/quarter/YTD views, compare YoY where relevant, and include SQL and table citations.
